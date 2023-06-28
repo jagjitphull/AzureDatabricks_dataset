@@ -1,0 +1,34 @@
+
+1) Register table
+
+CREATE TABLE retail_sales_pipeline
+AS SELECT * FROM delta.`dbfs:/pipelines/40330493-38ea-4157-b920-a337b9e8f77a/system/events`
+
+
+################
+2. use Databricks SQL, new query and paste the contents.
+
+WITH all_expectations AS (
+    SELECT
+        explode(
+          from_json(
+            details:flow_progress:data_quality:expectations,
+            schema_of_json("[{'name':'str', 'dataset':'str',
+            'passed_records':'int', 'failed_records':'int'}]")
+          )
+        ) AS expectation
+      FROM sales_order_pipeline
+
+      WHERE details:flow_progress.metrics IS NOT NULL
+)
+SELECT expectation_name,  X_Axis, SUM(Y_Axis) AS Y_Axis
+FROM (
+    SELECT expectation.name AS expectation_name, 'Passed'
+AS X_Axis, expectation.passed_records AS Y_Axis
+    FROM all_expectations
+    UNION ALL
+    SELECT expectation.name AS expectation_name, 'Failed'
+AS X_Axis, expectation.failed_records AS Y_Axis
+    FROM all_expectations
+  )
+GROUP BY expectation_name, X_Axis
